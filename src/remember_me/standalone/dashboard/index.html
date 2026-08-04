@@ -1,0 +1,321 @@
+<!-- SPDX-License-Identifier: CPAL-1.0 -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <title>Remember-Me</title>
+    <link rel="stylesheet" href="/dashboard/static/styles.css">
+    <script type="module" src="/dashboard/static/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#archive-main">Skip to archive</a>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-copy">
+          <strong>Remember-Me</strong>
+          <span>Private image archive</span>
+        </span>
+      </div>
+      <div class="topbar-actions">
+        <span class="asset-count" id="asset-count" aria-live="polite">0 images</span>
+        <button class="button button-quiet" id="connection-button" type="button">
+          <span class="status-dot" id="connection-dot" aria-hidden="true"></span>
+          <span id="connection-label">Local</span>
+        </button>
+        <button class="button button-quiet" id="about-button" type="button">About</button>
+        <button class="button button-primary" id="open-upload-button" type="button">
+          <span aria-hidden="true">+</span>
+          Upload
+        </button>
+      </div>
+    </header>
+
+    <main id="archive-main">
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Dusk Archive</p>
+        <h1 id="page-title">Your image memory</h1>
+        <p>Search, organize, and revisit saved images.</p>
+      </section>
+
+      <section class="tools" aria-label="Archive tools">
+        <div class="search-row">
+          <label class="search-field" for="search-input">
+            <span class="search-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Search images</span>
+            <input
+              id="search-input"
+              type="search"
+              autocomplete="off"
+              placeholder="Search title, tag, filename, or asset ID"
+            >
+          </label>
+          <button
+            class="button button-secondary"
+            id="toggle-filters-button"
+            type="button"
+            aria-expanded="false"
+            aria-controls="filters-panel"
+          >
+            Filters
+            <span class="filter-count" id="filter-count" hidden>0</span>
+          </button>
+        </div>
+
+        <div class="filters" id="filters-panel" hidden>
+          <div class="field">
+            <label for="tags-filter">Tags</label>
+            <input id="tags-filter" type="text" autocomplete="off" placeholder="travel, family">
+          </div>
+          <div class="field">
+            <label for="mime-filter">Format</label>
+            <select id="mime-filter">
+              <option value="">All formats</option>
+              <option value="image/png">PNG</option>
+              <option value="image/jpeg">JPEG</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="created-from">Created from</label>
+            <input id="created-from" type="date">
+          </div>
+          <div class="field">
+            <label for="created-to">Created to</label>
+            <input id="created-to" type="date">
+          </div>
+          <div class="field field-limit">
+            <label for="limit-select">Per page</label>
+            <select id="limit-select">
+              <option value="12">12</option>
+              <option value="20" selected>20</option>
+              <option value="30">30</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+          <button class="button button-quiet clear-filters" id="clear-filters-button" type="button">
+            Clear filters
+          </button>
+        </div>
+      </section>
+
+      <section class="archive-status" id="archive-status" aria-live="polite">
+        <div class="loading-line" id="loading-line" hidden>
+          <span class="spinner" aria-hidden="true"></span>
+          Loading archive
+        </div>
+        <p class="status-message" id="status-message"></p>
+      </section>
+
+      <section class="empty-state" id="empty-state" hidden>
+        <div class="empty-archive-mark" aria-hidden="true">
+          <span></span>
+        </div>
+        <h2 id="empty-title">No images yet.</h2>
+        <p id="empty-copy">Add your first image.</p>
+        <button class="button button-primary" id="empty-upload-button" type="button">
+          Add image
+        </button>
+      </section>
+
+      <section
+        class="asset-grid"
+        id="asset-grid"
+        aria-label="Saved images"
+        aria-busy="false"
+      ></section>
+
+      <nav class="pagination" aria-label="Archive pages">
+        <button class="button button-secondary" id="previous-button" type="button" disabled>
+          Previous
+        </button>
+        <span id="page-status">Page 1</span>
+        <button class="button button-secondary" id="next-button" type="button" disabled>
+          Next
+        </button>
+      </nav>
+    </main>
+
+    <footer>
+      <span>Remember-Me — originally created by Ting (peanutsuee)</span>
+      <span class="footer-divider" aria-hidden="true"></span>
+      <span>Local archive</span>
+    </footer>
+
+    <dialog class="modal upload-modal" id="upload-dialog" aria-labelledby="upload-title">
+      <form id="upload-form">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Add to archive</p>
+            <h2 id="upload-title">Upload an image</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="upload-dialog" aria-label="Close upload">
+            ×
+          </button>
+        </header>
+        <div class="modal-body">
+          <label class="drop-zone" id="drop-zone" for="file-input">
+            <input id="file-input" name="file" type="file" accept="image/png,image/jpeg" required>
+            <span class="drop-mark" aria-hidden="true"></span>
+            <strong>Choose a PNG or JPEG</strong>
+            <span>or drop it here, up to 10 MiB</span>
+          </label>
+          <div class="upload-preview" id="upload-preview" hidden>
+            <img id="upload-preview-image" alt="Selected image preview">
+            <dl class="file-facts">
+              <div><dt>File</dt><dd id="upload-file-name"></dd></div>
+              <div><dt>Type</dt><dd id="upload-file-type"></dd></div>
+              <div><dt>Size</dt><dd id="upload-file-size"></dd></div>
+            </dl>
+          </div>
+          <div class="field">
+            <label for="upload-title-input">Title</label>
+            <input id="upload-title-input" name="title" type="text" maxlength="200">
+          </div>
+          <div class="field">
+            <label for="upload-description">Description</label>
+            <textarea id="upload-description" name="description" maxlength="4000" rows="4"></textarea>
+          </div>
+          <div class="field">
+            <label for="upload-tags">Tags</label>
+            <input id="upload-tags" name="tags" type="text" placeholder="Separate tags with commas">
+          </div>
+          <p class="form-error" id="upload-error" role="alert" aria-live="assertive"></p>
+        </div>
+        <footer class="modal-actions">
+          <button class="button button-quiet" type="button" data-close-dialog="upload-dialog">Cancel</button>
+          <button class="button button-primary" id="upload-submit" type="submit">Upload image</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal detail-modal" id="detail-dialog" aria-labelledby="detail-title">
+      <article>
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Archive detail</p>
+            <h2 id="detail-title">Image details</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="detail-dialog" aria-label="Close details">
+            ×
+          </button>
+        </header>
+        <div class="detail-layout">
+          <div class="detail-image-wrap">
+            <img id="detail-image" alt="Selected archive image">
+            <p id="detail-image-error" class="image-error" hidden>Image preview is unavailable.</p>
+          </div>
+          <form class="detail-content" id="metadata-form">
+            <div class="field">
+              <label for="detail-title-input">Title</label>
+              <input id="detail-title-input" type="text" maxlength="200">
+            </div>
+            <div class="field">
+              <label for="detail-description">Description</label>
+              <textarea id="detail-description" maxlength="4000" rows="5"></textarea>
+            </div>
+            <div class="field">
+              <label for="detail-tags">Tags</label>
+              <input id="detail-tags" type="text">
+            </div>
+            <dl class="metadata-list" id="metadata-list"></dl>
+            <div class="asset-id-row">
+              <div>
+                <span>Asset ID</span>
+                <code id="detail-asset-id"></code>
+              </div>
+              <button class="button button-quiet" id="copy-id-button" type="button">Copy</button>
+            </div>
+            <p class="form-error" id="metadata-error" role="alert" aria-live="assertive"></p>
+            <div class="detail-actions">
+              <button class="button button-danger-outline" id="open-delete-button" type="button">
+                Delete image
+              </button>
+              <button class="button button-primary" id="save-metadata-button" type="submit">
+                Save changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </article>
+    </dialog>
+
+    <dialog class="modal confirm-modal" id="delete-dialog" aria-labelledby="delete-title">
+      <article>
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow danger-eyebrow">Permanent action</p>
+            <h2 id="delete-title">Delete this image?</h2>
+          </div>
+        </header>
+        <div class="modal-body">
+          <p>The archive entry and cleaned image will be removed.</p>
+          <p class="delete-target" id="delete-target"></p>
+          <p class="form-error" id="delete-error" role="alert" aria-live="assertive"></p>
+        </div>
+        <footer class="modal-actions">
+          <button class="button button-quiet" id="cancel-delete-button" type="button">Keep image</button>
+          <button class="button button-danger" id="confirm-delete-button" type="button">Delete</button>
+        </footer>
+      </article>
+    </dialog>
+
+    <dialog class="modal unlock-modal" id="unlock-dialog" aria-labelledby="unlock-title">
+      <form id="unlock-form">
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Protected archive</p>
+            <h2 id="unlock-title">Unlock Remember-Me</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="unlock-dialog" aria-label="Close unlock">
+            ×
+          </button>
+        </header>
+        <div class="modal-body">
+          <p>Enter the Bearer Token configured for this local Host.</p>
+          <div class="field">
+            <label for="token-input">Bearer Token</label>
+            <input id="token-input" type="password" autocomplete="off" minlength="32" required>
+          </div>
+          <p class="session-note">Stored only in this tab session.</p>
+          <p class="form-error" id="unlock-error" role="alert" aria-live="assertive"></p>
+        </div>
+        <footer class="modal-actions">
+          <button class="button button-quiet" id="clear-token-button" type="button">Clear Token</button>
+          <button class="button button-primary" type="submit">Unlock</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="modal about-modal" id="about-dialog" aria-labelledby="about-title">
+      <article>
+        <header class="modal-header">
+          <div>
+            <p class="eyebrow">Project information</p>
+            <h2 id="about-title">About Remember-Me</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog="about-dialog" aria-label="Close about">
+            ×
+          </button>
+        </header>
+        <div class="modal-body about-content">
+          <div class="about-mark" aria-hidden="true"></div>
+          <p class="about-attribution" id="about-attribution"></p>
+          <dl class="about-list" id="about-list"></dl>
+          <a id="official-repository-link" target="_blank" rel="noopener noreferrer">
+            Official repository
+          </a>
+          <p class="upstream-note">
+            Some image-core files preserve applicable MIT attribution from the
+            upstream Ombre-Brain implementation. See the project licensing and
+            source provenance documents.
+          </p>
+        </div>
+      </article>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite" aria-atomic="true"></div>
+  </body>
+</html>

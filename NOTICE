@@ -1,0 +1,20 @@
+Remember-Me
+Official repository: https://github.com/peanutsuee/Remember-Me
+
+Remember-Me 的原创构想、产品设计和独立项目由婷（peanutsuee）发起。
+Original concept, product design, and independent project initiated by
+Ting (peanutsuee).
+
+The six Stage 7B core modules were independently reimplemented from a frozen
+behavioral specification, public contracts, sanitized tests, and data
+compatibility requirements through a documented clean-room engineering
+process. This engineering process and its similarity reviews do not by
+themselves determine copyright ownership, legal independence, or license
+obligations. See docs/source-provenance.md.
+
+The repository preserves applicable upstream MIT rights and attribution for
+content and historical distributions that remain covered, including
+Copyright (c) 2026 P0lar1zzZ. See LICENSES/MIT-Ombre-Brain.txt.
+
+Redistributors must not remove applicable Remember-Me origin information or
+required upstream notices. This notice does not reassign upstream authorship.

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "remember-me"
+version = "0.1.0.dev7"
+description = "An independent image memory, storage, retrieval, and management core."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+dependencies = [
+  "Pillow>=10.4,<13",
+]
+authors = [
+  { name = "Ting (peanutsuee)" },
+]
+keywords = ["images", "storage", "search", "sqlite", "memory"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.optional-dependencies]
+standalone = [
+  "fastapi>=0.115.14,<0.116",
+  "mcp>=1.28.1,<1.29",
+  "pydantic>=2.11,<2.13",
+  "python-multipart>=0.0.20,<0.1",
+  "uvicorn>=0.33,<0.34",
+]
+test = [
+  "build>=1.2.2.post1,<2",
+  "httpx>=0.28.1,<0.29",
+  "PyYAML>=5.4,<7",
+  "pytest>=7,<9",
+  "tomli>=1; python_version < '3.11'",
+]
+
+[project.scripts]
+remember-me = "remember_me.standalone.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/peanutsuee/Remember-Me"
+Repository = "https://github.com/peanutsuee/Remember-Me"
+Issues = "https://github.com/peanutsuee/Remember-Me/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+license-files = ["LICENSE", "LICENSES/*.txt", "NOTICE"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+remember_me = [
+  "mcp/*.html",
+  "standalone/dashboard/*.html",
+  "standalone/dashboard/*.css",
+  "standalone/dashboard/*.js",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

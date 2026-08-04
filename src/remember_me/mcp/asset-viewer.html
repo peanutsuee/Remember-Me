@@ -1,0 +1,156 @@
+<!-- SPDX-License-Identifier: CPAL-1.0 -->
+<!-- Original concept, product design, and independent project initiated by Ting (peanutsuee). -->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+  <title>Remember-Me image viewer</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; }
+    body { margin: 0; color: #29242d; background: #fffdf9; }
+    main { display: grid; gap: 14px; padding: 16px; }
+    img { display: block; width: 100%; max-height: 70vh; object-fit: contain; background: #eee7f0; }
+    img[data-state="empty"] { display: none; }
+    h1 { margin: 0; font-size: 1.15rem; overflow-wrap: anywhere; }
+    p { margin: 0; color: #756d79; overflow-wrap: anywhere; }
+    ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    li { padding: 3px 7px; border: 1px solid #d9d0dc; border-radius: 4px; }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main aria-live="polite">
+    <img id="asset-image" data-state="empty" alt="Privacy-cleaned archive image">
+    <h1 id="asset-title">Connecting to viewer host</h1>
+    <p id="asset-file"></p>
+    <p id="asset-details"></p>
+    <ul id="asset-tags" aria-label="Tags"></ul>
+  </main>
+  <script>
+    "use strict";
+    const image = document.getElementById("asset-image");
+    const title = document.getElementById("asset-title");
+    const file = document.getElementById("asset-file");
+    const details = document.getElementById("asset-details");
+    const tags = document.getElementById("asset-tags");
+    const protocolVersion = "2026-01-26";
+    const pendingRequests = new Map();
+    let nextRequestId = 1;
+
+    function showError(message) {
+      image.setAttribute("data-state", "empty");
+      image.setAttribute("src", "");
+      title.textContent = "Viewer unavailable";
+      file.textContent = "";
+      details.textContent = message;
+      tags.replaceChildren();
+    }
+
+    function post(message) {
+      window.parent.postMessage(message, "*");
+    }
+
+    function request(method, params) {
+      const id = nextRequestId;
+      nextRequestId += 1;
+      pendingRequests.set(id, method);
+      post({
+        jsonrpc: "2.0",
+        id,
+        method,
+        params,
+      });
+      return id;
+    }
+
+    function initialize() {
+      request("ui/initialize", {
+        protocolVersion,
+        appInfo: {
+          name: "Remember-Me asset viewer",
+          version: "v1alpha1",
+        },
+        appCapabilities: {},
+      });
+    }
+
+    function render(result) {
+      const meta = result && result._meta && result._meta.remember_me;
+      const asset = meta && meta.asset;
+      const media = meta && meta.image;
+      const mimeType = media && media.mime_type;
+      if (
+        !asset ||
+        typeof asset !== "object" ||
+        !media ||
+        typeof media !== "object" ||
+        (mimeType !== "image/png" && mimeType !== "image/jpeg") ||
+        asset.mime_type !== mimeType ||
+        !Number.isFinite(asset.width) ||
+        asset.width <= 0 ||
+        !Number.isFinite(asset.height) ||
+        asset.height <= 0 ||
+        !Array.isArray(asset.tags) ||
+        typeof media.data !== "string" ||
+        media.data.length === 0
+      ) {
+        showError("The image result was missing or invalid.");
+        return;
+      }
+      title.textContent = asset.title || asset.original_filename || "Remember-Me image";
+      file.textContent = asset.original_filename || "";
+      details.textContent = `${asset.width} x ${asset.height} | ${asset.mime_type}`;
+      tags.replaceChildren();
+      (asset.tags || []).forEach((value) => {
+        const item = document.createElement("li");
+        item.textContent = String(value);
+        tags.append(item);
+      });
+      image.setAttribute("data-state", "loading");
+      image.setAttribute("src", `data:${mimeType};base64,${media.data}`);
+    }
+
+    image.addEventListener("load", () => {
+      image.setAttribute("data-state", "ready");
+    });
+    image.addEventListener("error", () => {
+      showError("The privacy-cleaned image could not be decoded.");
+    });
+
+    window.addEventListener("message", (event) => {
+      if (event.source !== window.parent) return;
+      const data = event.data;
+      if (!data || typeof data !== "object" || data.jsonrpc !== "2.0") return;
+
+      if (Object.prototype.hasOwnProperty.call(data, "id")) {
+        const method = pendingRequests.get(data.id);
+        if (!method) return;
+        pendingRequests.delete(data.id);
+        if (method === "ui/initialize") {
+          if (data.error || !data.result || typeof data.result !== "object") {
+            showError("The viewer host could not be initialized.");
+            return;
+          }
+          post({
+            jsonrpc: "2.0",
+            method: "ui/notifications/initialized",
+            params: {},
+          });
+        }
+        return;
+      }
+
+      if (data.method === "ui/notifications/tool-result") {
+        render(data.params);
+      }
+    });
+
+    initialize();
+    if (window.openai && window.openai.toolOutput) {
+      render(window.openai.toolOutput);
+    }
+  </script>
+</body>
+</html>
