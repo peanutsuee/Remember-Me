@@ -622,12 +622,28 @@ class RememberMeService:
             if asset is None:
                 raise AssetUnavailable()
             assets = (asset,)
+        provider = self.vector_provider
+        provider_state_failed = False
         try:
-            enabled = bool(self.vector_provider.enabled)
-            model_id = self.vector_provider.model_id
+            enabled = bool(provider.enabled)
+            model_id = provider.model_id
+            if type(model_id) is not str or not model_id.strip():
+                provider_state_failed = True
         except Exception:
+            provider_state_failed = True
             enabled = False
             model_id = ""
+
+        def provider_unchanged():
+            try:
+                return (
+                    self.vector_provider is provider
+                    and bool(provider.enabled) == enabled
+                    and provider.model_id == model_id
+                )
+            except Exception:
+                return False
+
         indexed = skipped = failed = 0
         for asset in assets:
             try:
@@ -640,26 +656,28 @@ class RememberMeService:
                     and existing.content_hash == content_hash
                     and bool(text)
                 )
-                if not enabled:
-                    if current or existing is None:
-                        skipped += 1
-                    else:
-                        self.repository.delete_embedding(asset.asset_id)
-                        failed += 1
-                    continue
                 if not text:
                     if existing is not None:
+                        self.repository.delete_embedding(asset.asset_id)
+                    skipped += 1
+                    continue
+                if provider_state_failed:
+                    failed += 1
+                    continue
+                if not provider_unchanged():
+                    failed += 1
+                    continue
+                if not enabled:
+                    if not current and existing is not None:
                         self.repository.delete_embedding(asset.asset_id)
                     skipped += 1
                     continue
                 if current:
                     skipped += 1
                     continue
-                if existing is not None:
-                    self.repository.delete_embedding(asset.asset_id)
                 try:
                     vector = validate_embedding_vector(
-                        await self.vector_provider.embed(text)
+                        await provider.embed(text)
                     )
                 except asyncio.CancelledError:
                     raise
@@ -667,6 +685,9 @@ class RememberMeService:
                     failed += 1
                     continue
                 if vector is None:
+                    failed += 1
+                    continue
+                if not provider_unchanged():
                     failed += 1
                     continue
                 record = EmbeddingRecord(

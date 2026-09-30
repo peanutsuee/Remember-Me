@@ -297,8 +297,8 @@ def register_tools(mcp, runtime, uploads, downloads) -> None:
                         enabled=False,
                         model_id=result.model_id,
                         selected=result.scanned,
-                        indexed=0,
-                        failed=0,
+                        indexed=result.indexed,
+                        failed=result.failed,
                     ),
                 )
             return _success(
