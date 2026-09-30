@@ -5,9 +5,10 @@ transport contracts evolve at different rates.
 
 ## Python package version
 
-The installable package uses PEP 440. The current public preview is
-`0.1.0.dev8`; the previous public preview was `0.1.0.dev7`. Package versions
-describe released code, not the age of pre-existing integrated prototypes.
+The installable package uses PEP 440. The current package version is `0.1.0`;
+its planned GitHub Release tag is `v0.1.0`. This early 0.x release does
+not promise long-term API stability. Package versions describe released code,
+not the age of pre-existing integrated prototypes.
 
 Stage 7F validates `Pillow>=10.4,<13` with Pillow 10.4.0, 11.3.0, and 12.3.0.
 This is a package-runtime compatibility change only. HTTP API, Dashboard, MCP
@@ -78,6 +79,9 @@ preserves old embeddings until validated replacements are ready. It keeps
 historical spelling restoration or data migration. See
 [data compatibility](data-compatibility.md) for import and downgrade boundaries.
 
-Build a release source archive from the exact final commit with a fixed archive
-prefix and `gzip -n`. Record the commit, tree, package version, archive SHA-256,
-and provenance in the release manifest.
+The release channel for `0.1.0` is GitHub Release only; do not publish it to
+PyPI. Attach the self-built, installed, and validated
+`remember_me-0.1.0.tar.gz` source distribution to the `v0.1.0` release.
+GitHub's automatically generated source archives are not OB pin targets. A
+later OB integration should pin the exact validated source distribution by
+SHA-256 and record its release URL, commit, tree, version, and provenance.

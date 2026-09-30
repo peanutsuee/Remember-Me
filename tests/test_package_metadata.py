@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_package_import_and_version():
-    assert remember_me.__version__ == "0.1.0.dev8"
-    assert metadata.PROJECT_VERSION == "0.1.0.dev8"
+    assert remember_me.__version__ == "0.1.0"
+    assert metadata.PROJECT_VERSION == "0.1.0"
 
 
 def test_canonical_project_identity():
@@ -32,7 +32,7 @@ def test_canonical_project_identity():
 
 def test_pyproject_identity_matches_package():
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'version = "0.1.0.dev8"' in text
+    assert 'version = "0.1.0"' in text
     assert 'name = "Ting (peanutsuee)"' in text
     assert metadata.OFFICIAL_REPOSITORY in text
 

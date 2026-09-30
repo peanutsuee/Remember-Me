@@ -15,7 +15,8 @@ SDK v1 requires Python 3.10+.
 
 ## Stage 7H-A status
 
-The current package version is `0.1.0.dev8`. The privacy-safe image core,
+The current package version is `0.1.0`. This early 0.x release does not
+promise long-term API stability. The privacy-safe image core,
 Standalone HTTP Host, original local Dashboard, and public Standalone MCP
 server are implemented for local development.
 
@@ -152,7 +153,7 @@ The caller owns process lifecycle, access control, and backup policy.
 
 ## Version dimensions
 
-- Python package: `0.1.0.dev8`
+- Python package: `0.1.0`
 - HTTP API: `v1alpha1`, routes under `/api/v1`
 - Dashboard: `v1alpha1`
 - MCP API: `v1alpha1`, Streamable HTTP at `/mcp`
@@ -160,6 +161,10 @@ The caller owns process lifecycle, access control, and backup policy.
 
 These versions evolve independently. The HTTP API, Dashboard, and MCP API
 remain development contracts without a long-term stability promise.
+
+`0.1.0` is planned for GitHub Release only under tag `v0.1.0`; it will not be
+published to PyPI. A later OB integration should pin the self-built and
+validated `remember_me-0.1.0.tar.gz`, not GitHub's automatic source archives.
 
 The Pillow range does not change `ombre-brain-assets-v1`, sanitizer behavior,
 hash algorithms, content-addressed paths, or public API contracts. Revalidate
@@ -253,7 +258,7 @@ See `NOTICE`,
 
 ## Unicode metadata and semantic search
 
-`0.1.0.dev8` preserves safely cleaned metadata spelling without NFC or
+`0.1.0` preserves safely cleaned metadata spelling without NFC or
 NFKC storage/display rewriting. Comparison, tag identity, search and filtering
 use separate NFKC canonical keys. Schema and blob/hash identity are unchanged;
 there is no historical spelling restoration or migration. Import preserves

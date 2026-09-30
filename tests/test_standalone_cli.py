@@ -12,14 +12,14 @@ def test_version_and_about_include_project_identity(capsys):
     assert raised.value.code == 0
     version = capsys.readouterr().out
     assert "Remember-Me" in version
-    assert "0.1.0.dev8" in version
+    assert "0.1.0" in version
     assert "originally created by Ting (peanutsuee)" in version
 
     assert main(["about"]) == 0
     about = capsys.readouterr().out
     for expected in [
         "Remember-Me",
-        "0.1.0.dev8",
+        "0.1.0",
         "Ting (peanutsuee)",
         "v1alpha1",
         "MCP API",

@@ -131,7 +131,7 @@ def test_public_contract_and_version_are_exported():
         "title", "description", "tags", "dry_run",
     }
     assert "cleaned_bytes=" not in repr(_request())
-    assert PROJECT_VERSION == __version__ == "0.1.0.dev8"
+    assert PROJECT_VERSION == __version__ == "0.1.0"
 
 
 @pytest.mark.parametrize(

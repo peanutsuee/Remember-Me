@@ -32,8 +32,7 @@ Package version `0.1.0.dev7` adds four synchronous, read-only Core operations
 for bounded verification of one local asset target. They are generic Core
 capabilities and are not part of Search, Reindex, HTTP, MCP, or any
 host-specific workflow. The immutable release commit and archive digest will
-be determined by the later release stage; this development tree does not
-declare either value.
+be recorded with the release provenance after the final artifact is built.
 
 `begin_asset_verification` creates a short-lived generation-guarded session.
 The result contains an unpredictable opaque snapshot token, a persistent

@@ -275,7 +275,7 @@ def test_dashboard_card_preview_state_contract():
 def test_dashboard_identity_and_package_data():
     html = _read("index.html")
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert metadata.PROJECT_VERSION == "0.1.0.dev8"
+    assert metadata.PROJECT_VERSION == "0.1.0"
     assert metadata.DASHBOARD_VERSION == "v1alpha1"
     assert "Remember-Me" in html
     assert "originally created by Ting (peanutsuee)" in html

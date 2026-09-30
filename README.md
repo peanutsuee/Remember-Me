@@ -12,7 +12,7 @@ Stage 7E 要求 Python 3.10 或更高版本，因为稳定版官方 MCP Python S
 
 ## Stage 7H-A 状态
 
-当前包版本为 `0.1.0.dev8`。隐私安全的图像 Core（privacy-safe image core）、Standalone HTTP Host、原始本地 Dashboard 以及公开的 Standalone MCP server 已实现，可用于本地开发。
+当前包版本为 `0.1.0`。隐私安全的图像 Core（privacy-safe image core）、Standalone HTTP Host、原始本地 Dashboard 以及公开的 Standalone MCP server 已实现，可用于本地开发。0.x 是早期公开版本，不承诺长期 API 稳定。
 
 - Dashboard 可在本地预览（Dashboard is available for local preview），并可执行真实资产操作，地址为 `/dashboard`。
 - PNG/JPEG 上传、清理、浏览、搜索、筛选、元数据编辑、清理后图像预览和安全删除，均已通过 `/api/v1` 接入。
@@ -114,13 +114,17 @@ service = create_local_service("./remember-me-data")
 
 ## 版本维度
 
-- Python package：`0.1.0.dev8`
+- Python package：`0.1.0`
 - HTTP API：`v1alpha1`，路由位于 `/api/v1` 下
 - Dashboard：`v1alpha1`
 - MCP API：`v1alpha1`，位于 `/mcp` 的 Streamable HTTP
 - 数据兼容性：`ombre-brain-assets-v1`
 
 这些版本独立演进。HTTP API、Dashboard 和 MCP API 都是开发阶段契约，不承诺长期稳定性。
+
+`0.1.0` 计划仅通过 GitHub Release 的 `v0.1.0` 发布，不上传 PyPI。供后续
+OB 固定的是自行构建并验证的 `remember_me-0.1.0.tar.gz`，不是 GitHub
+自动生成的源码包。
 
 Pillow 版本范围不会改变 `ombre-brain-assets-v1`、sanitizer 行为、hash 算法、content-addressed paths 或 public API contracts。升级固定的生产 Pillow 版本前，请重新验证图像输出。
 
@@ -169,7 +173,7 @@ Stage 7D Dashboard 和 Stage 7E MCP adapter 是原创的 CPAL 实现。没有阅
 
 ## Unicode metadata 与语义检索
 
-`0.1.0.dev8` 保留安全清洗后的 metadata spelling，storage/display
+`0.1.0` 保留安全清洗后的 metadata spelling，storage/display
 不主动 NFC/NFKC；比较、tag identity、搜索和过滤单独使用 NFKC canonical key。
 不修改 schema、blob/hash identity，不迁移或恢复历史 spelling。
 Import 保留 spelling 和 timestamps，但拒绝 canonical tag collision；旧版本的

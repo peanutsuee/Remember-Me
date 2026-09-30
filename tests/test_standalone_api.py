@@ -107,7 +107,7 @@ def test_public_routes_and_security_headers(tmp_path):
 
     about = client.get("/api/v1/about")
     assert about.status_code == 200
-    assert about.json()["project_version"] == "0.1.0.dev8"
+    assert about.json()["project_version"] == "0.1.0"
     assert about.json()["http_api_version"] == "v1alpha1"
     assert about.json()["dashboard_version"] == "v1alpha1"
     assert about.json()["mcp_api_version"] == "v1alpha1"
