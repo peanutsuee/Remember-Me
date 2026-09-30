@@ -47,6 +47,10 @@ rank results itself. With an enabled host-injected provider, current same-model
 and same-dimension embeddings may contribute semantic matches through the
 existing result contract. The `NullVectorProvider` keeps the default Standalone
 runtime keyword-only and network-free.
+Core's default semantic minimum is `0.42`, configurable through its Python
+constructor or factory. The MCP search input and output schemas are unchanged;
+low-score pure semantic candidates are absent, and no match returns an empty
+`items` list with `total=0`.
 
 ## Metadata and embeddings
 
@@ -60,6 +64,9 @@ provider, write the repository, or implement counters. With the default Null
 provider it reports `enabled=false`; it does not treat the lack of a vector
 service as an error. Its existing `selected`, `indexed`, and `failed` output
 shape remains unchanged, and Core-only `scanned` and `skipped` are not exposed.
+The `failed` value reflects Core failures even when `enabled=false`; it is not
+forced to zero. Reindex preserves an old vector during provider failure or
+cancellation and replaces it only after a validated result is ready.
 Stage 7G-B search consumes current embeddings in Core without changing the
 nine MCP tool names, input schemas, output envelope, or error envelope.
 Provider and per-record vector failures do not become new public MCP errors.

@@ -5,7 +5,8 @@ transport contracts evolve at different rates.
 
 ## Python package version
 
-The installable package uses PEP 440. Stage 8H-B0B is `0.1.0.dev7`. Package versions
+The installable package uses PEP 440. The current public preview is
+`0.1.0.dev8`; the previous public preview was `0.1.0.dev7`. Package versions
 describe released code, not the age of pre-existing integrated prototypes.
 
 Stage 7F validates `Pillow>=10.4,<13` with Pillow 10.4.0, 11.3.0, and 12.3.0.
@@ -67,3 +68,16 @@ Each Remember-Me release that claims Ombre Brain compatibility must record:
 
 Historical private integration labels are not independent Remember-Me package
 versions and must not be used as public release identifiers.
+
+## Current metadata, search and reindex policy
+
+The current package separates storage/display spelling from NFKC comparison
+keys, applies a configurable Core semantic minimum of `0.42` by default, and
+preserves old embeddings until validated replacements are ready. It keeps
+`ombre-brain-assets-v1` and the HTTP and MCP schemas unchanged. There is no
+historical spelling restoration or data migration. See
+[data compatibility](data-compatibility.md) for import and downgrade boundaries.
+
+Build a release source archive from the exact final commit with a fixed archive
+prefix and `gzip -n`. Record the commit, tree, package version, archive SHA-256,
+and provenance in the release manifest.

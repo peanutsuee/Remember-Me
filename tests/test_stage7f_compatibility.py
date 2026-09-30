@@ -27,7 +27,7 @@ def _read(relative_path):
 
 
 def test_stage7f_package_and_pillow_contract():
-    assert metadata.PROJECT_VERSION == "0.1.0.dev7"
+    assert metadata.PROJECT_VERSION == "0.1.0.dev8"
     assert metadata.HTTP_API_VERSION == "v1alpha1"
     assert metadata.DASHBOARD_VERSION == "v1alpha1"
     assert metadata.MCP_API_VERSION == "v1alpha1"

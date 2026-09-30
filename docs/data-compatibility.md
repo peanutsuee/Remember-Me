@@ -106,6 +106,11 @@ filename, then other substring matches. Within equal rank, newer creation time
 sorts first and asset ID is the stable final tie-breaker. Semantic-only results
 sort by descending score, then creation time and asset ID. Filters require all
 requested normalized tags.
+Core admits a semantic contribution only when its positive cosine score meets
+the configured minimum (`0.42` by default), before total and pagination.
+Keyword matches survive lower semantic scores. Search does not rewrite vectors
+or metadata. Reindex replaces a vector transactionally after generation and
+validation; failed or cancelled generation leaves the old stored row intact.
 
 Deduplication is based on `stored_sha256`, so different source files that clean
 to identical stored bytes resolve to the same asset.

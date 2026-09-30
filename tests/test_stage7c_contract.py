@@ -40,7 +40,7 @@ def _read(relative_path):
 
 
 def test_stage7c_versions_and_dependency_stack():
-    assert metadata.PROJECT_VERSION == "0.1.0.dev7"
+    assert metadata.PROJECT_VERSION == "0.1.0.dev8"
     assert metadata.HTTP_API_VERSION == "v1alpha1"
     assert metadata.HTTP_ROUTE_PREFIX == "/api/v1"
     assert fastapi.__version__ == "0.115.14"
@@ -101,7 +101,7 @@ def test_core_does_not_import_standalone_or_web_dependencies():
 def test_readme_and_security_contracts():
     readme = _read("README.md")
     for phrase in [
-        "`0.1.0.dev7`",
+        "`0.1.0.dev8`",
         "Standalone HTTP Host",
         "127.0.0.1",
         "REMEMBER_ME_ALLOW_NETWORK",

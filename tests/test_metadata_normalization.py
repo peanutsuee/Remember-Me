@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: CPAL-1.0
-"""W-12 storage spelling, comparison identity and safety contract."""
+"""Unicode storage spelling, comparison identity and safety contract."""
 import pytest
 
 from remember_me.core.errors import ImportMetadataValidationError, InvalidMetadata
