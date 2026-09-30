@@ -16,7 +16,9 @@ class LocalRuntime:
     blob_store: LocalContentStore
 
 
-def create_local_runtime(data_root, clock=None, vector_provider=None):
+def create_local_runtime(
+    data_root, clock=None, vector_provider=None, semantic_min_score=0.42
+):
     repository = SQLiteAssetRepository(data_root)
     blob_store = LocalContentStore(data_root)
     service = RememberMeService(
@@ -29,6 +31,7 @@ def create_local_runtime(data_root, clock=None, vector_provider=None):
             if vector_provider is not None
             else NullVectorProvider()
         ),
+        semantic_min_score=semantic_min_score,
     )
     return LocalRuntime(
         service=service,
@@ -37,9 +40,12 @@ def create_local_runtime(data_root, clock=None, vector_provider=None):
     )
 
 
-def create_local_service(data_root, clock=None, vector_provider=None):
+def create_local_service(
+    data_root, clock=None, vector_provider=None, semantic_min_score=0.42
+):
     return create_local_runtime(
         data_root,
         clock=clock,
         vector_provider=vector_provider,
+        semantic_min_score=semantic_min_score,
     ).service

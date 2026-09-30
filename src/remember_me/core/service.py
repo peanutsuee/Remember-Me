@@ -7,6 +7,7 @@ import asyncio
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import hashlib
+import math
 import re
 import secrets
 import threading
@@ -131,12 +132,24 @@ class RememberMeService:
         image_sanitizer,
         clock,
         vector_provider,
+        semantic_min_score=0.42,
     ):
+        if isinstance(semantic_min_score, bool) or not isinstance(
+            semantic_min_score, (int, float)
+        ):
+            raise ValueError("invalid_semantic_min_score")
+        try:
+            threshold = float(semantic_min_score)
+        except (OverflowError, TypeError, ValueError):
+            raise ValueError("invalid_semantic_min_score") from None
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError("invalid_semantic_min_score")
         self.repository = repository
         self.blob_store = blob_store
         self.image_sanitizer = image_sanitizer
         self.clock = clock
         self.vector_provider = vector_provider
+        self.semantic_min_score = threshold
         self._verification_sessions: dict[str, _VerificationSession] = {}
         self._verification_sessions_lock = threading.RLock()
 
@@ -538,7 +551,11 @@ class RememberMeService:
             ):
                 continue
             score = cosine_similarity(query_vector, record.embedding)
-            if score is not None and score > 0.0:
+            if (
+                score is not None
+                and score > 0.0
+                and score >= self.semantic_min_score
+            ):
                 semantic_scores[asset.asset_id] = score
         combined = []
         for item in keyword.results:
