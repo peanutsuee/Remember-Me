@@ -70,11 +70,34 @@ Timestamps are UTC ISO 8601 strings with explicit offsets, stored to whole
 seconds. `created_at` is asset creation time. `updated_at` begins at creation
 time and changes when editable metadata changes.
 
-Title and description are user-facing metadata, limited to 200 and 4,000
-characters after NFKC/control cleanup. Tags receive NFKC cleanup, whitespace
-collapse, case-folded identity, first-display preservation, empty removal, and
-case-insensitive deduplication. A tag is limited to 64 characters and an asset
-to 30 tags.
+Title and description retain spelling after the existing control-character
+handling, whitespace collapse and strip. Storage does not apply NFC or NFKC.
+The limits remain 200 and 4,000 characters; both stored length and the previous
+NFKC-cleaned length must fit. Tags use the same safe display cleaning (64
+characters, at most 30 tags). Comparison keys independently apply NFKC,
+control handling, whitespace collapse, strip and casefold. `tag_normalized`
+continues to store that key; `tag_display` stores the selected safe spelling.
+
+Within a new tag group, the first spelling wins for a shared key. Results are
+sorted by canonical key. An update with the same key set keeps existing display
+spelling and tag timestamps; a changed key set rebuilds tags as before. No
+ordinal column, schema change or historical metadata rewrite is introduced.
+Filenames retain their existing separator/control/whitespace/fallback safety.
+Compatibility copies still protect path checks, but safe filename spelling is
+not Unicode-normalized. Blob paths and asset/hash identity are unchanged.
+
+Keyword search and metadata tag filters canonicalize both query and stored
+candidate values. This also applies to semantic-only metadata filtering; vector
+ranking and provider behavior are unchanged. Old NFKC-stored metadata remains
+readable and searchable alongside new spelling. Code fix does not restore lost
+historical spelling: no migration, guessing or Data Repair is performed.
+
+Import validates storage safety rather than requiring NFKC spelling. Canonical
+tag collisions still fail, preserving timestamped tags rather than silently
+folding them. Full-record conflict/idempotency checks still compare spelling
+and timestamps as well as identity. Public metadata serialization and import
+preserve stored spelling. Older packages may reject these new import spellings
+or fail compatibility searches; downgrading is not a restoration mechanism.
 
 ## Search and consistency
 

@@ -2,6 +2,9 @@
 from remember_me.core.models import AssetRecord, SearchAssetsRequest
 from remember_me.search import keyword_search
 
+import pytest
+from test_metadata_normalization import UNICODE_CASES
+
 
 def _asset(asset_id, created_at, filename, title="", description="", tags=()):
     digest = asset_id[0] * 64
@@ -102,3 +105,30 @@ def test_asset_id_exact_has_highest_priority():
     )
     assert result.results[0].asset.asset_id == exact.asset_id
     assert result.results[0].match_reasons[0] == "asset_id_exact"
+
+
+@pytest.mark.parametrize("spelling,counterpart,key", UNICODE_CASES)
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("field,reason", [
+    ("title", "title_exact"), ("description", "description"),
+    ("filename", "filename"), ("tags", "tag_exact"),
+])
+def test_unicode_keyword_and_tag_filter_both_sides(spelling, counterpart, key, reverse, field, reason):
+    stored, query = (counterpart, spelling) if reverse else (spelling, counterpart)
+    values = dict(filename="photo.png", title="", description="", tags=())
+    values[field] = (stored,) if field == "tags" else stored
+    asset = _asset("a" * 32, "2026-07-01T00:00:00+00:00", **values)
+    result = keyword_search((asset,), SearchAssetsRequest(query=query))
+    assert result.total == 1
+    assert result.results[0].match_reasons == (reason,)
+    assert result.results[0].asset == asset
+    tagged = _asset("b" * 32, asset.created_at, "photo.png", tags=(stored,))
+    assert keyword_search((tagged,), SearchAssetsRequest(tags=(query,))).total == 1
+
+
+def test_punctuation_casefold_and_whitespace_comparison():
+    asset = _asset("a" * 32, "2026-07-01T00:00:00+00:00", "photo.png", tags=("Straße", "a，b", "a-b"), title="Ａ  B")
+    for query in ("STRASSE", "a,b", "a-b", "A B"):
+        assert keyword_search((asset,), SearchAssetsRequest(query=query)).total == 1
+    assert keyword_search((asset,), SearchAssetsRequest(query="ab")).total == 0
+    assert keyword_search((asset,), SearchAssetsRequest(tags=("STRASSE", "a,b"))).total == 1

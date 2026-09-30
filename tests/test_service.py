@@ -6,6 +6,8 @@ import re
 import concurrent.futures
 from datetime import datetime, timezone
 
+from test_metadata_normalization import UNICODE_CASES
+
 import pytest
 from PIL import Image
 
@@ -352,3 +354,40 @@ def test_delete_rejects_path_traversal_and_missing_file(tmp_path):
     with pytest.raises(AssetFileUnavailable):
         service.delete_asset(DeleteAssetRequest(missing.asset_id))
     assert repository.get(missing.asset_id) is not None
+
+
+@pytest.mark.parametrize("spelling,counterpart,key", UNICODE_CASES)
+def test_direct_ingest_update_keep_spelling_and_content_identity(tmp_path, spelling, counterpart, key):
+    service, repository, blobs, _ = _service(tmp_path)
+    content = _png()
+    first = service.ingest_image(IngestImageRequest(
+        content=content, expected_bytes=len(content), filename=spelling + ".png",
+        title=spelling, description=spelling, tags=(spelling, counterpart),
+    ))
+    asset = first.asset
+    assert (asset.title, asset.description, asset.original_filename, asset.tags) == (
+        spelling, spelling, spelling + ".png", (spelling,),
+    )
+    assert repository.get(asset.asset_id) == asset
+    assert blobs.read(asset.stored_relpath)
+    duplicate = service.ingest_image(IngestImageRequest(
+        content=content, expected_bytes=len(content), filename=counterpart + ".png",
+        title=counterpart, tags=(counterpart,),
+    ))
+    assert duplicate.deduplicated and duplicate.asset == asset
+    updated = service.update_metadata(UpdateMetadataRequest(
+        asset_id=asset.asset_id, title=counterpart, description=counterpart,
+        tags=(counterpart,),
+    ))
+    assert updated.tags == (spelling,)
+    assert updated.title == updated.description == counterpart
+    assert (updated.asset_id, updated.source_sha256, updated.stored_sha256, updated.stored_relpath) == (
+        asset.asset_id, asset.source_sha256, asset.stored_sha256, asset.stored_relpath,
+    )
+    assert asyncio.run(service.search_assets(SearchAssetsRequest(query=spelling, tags=(spelling,)))).total == 1
+
+    restored = service.update_metadata(UpdateMetadataRequest(
+        asset_id=asset.asset_id, title=spelling, description=spelling,
+    ))
+    assert restored.title == restored.description == spelling
+    assert repository.get(asset.asset_id) == restored

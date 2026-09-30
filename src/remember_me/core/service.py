@@ -77,6 +77,7 @@ from .normalization import (
     normalize_import_title,
     normalize_tags,
     normalize_title,
+    tag_comparison_key,
     validate_import_filename,
     validate_import_tags,
 )
@@ -273,7 +274,9 @@ class RememberMeService:
                 raise ImportMetadataValidationError()
             tag_values.append(tag.value)
         ordered = validate_import_tags(tuple(tag_values))
-        tag_times = {tag.value.casefold(): tag.created_at for tag in request.tags}
+        tag_times = {
+            tag_comparison_key(tag.value): tag.created_at for tag in request.tags
+        }
         tags = tuple(
             ImportAssetTag(display, tag_times[identity])
             for identity, display in ordered

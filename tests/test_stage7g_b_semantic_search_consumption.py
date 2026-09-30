@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: CPAL-1.0
 from __future__ import annotations
 
+from test_metadata_normalization import UNICODE_CASES
+
 import asyncio
 import json
 import math
@@ -693,3 +695,18 @@ def test_mcp_search_contains_no_vector_or_repository_orchestration():
         "cosine_similarity",
     ):
         assert forbidden not in block
+
+
+@pytest.mark.parametrize("spelling,counterpart,key", UNICODE_CASES)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_semantic_metadata_tag_filter_canonicalizes_both_sides(tmp_path, spelling, counterpart, key, reverse):
+    stored, query_tag = (counterpart, spelling) if reverse else (spelling, counterpart)
+    provider = QueryProvider()
+    runtime, asset = _runtime_with_asset(tmp_path, provider, _asset(tags=(stored,)))
+    _store_current(runtime.repository, asset)
+    result = _run_search(runtime.service, SearchAssetsRequest(query="ocean", tags=(query_tag,)))
+    assert result.total == 1
+    assert result.results[0].asset == asset
+    assert result.results[0].match_reasons == ("semantic",)
+    assert provider.calls == ["ocean"]
+    assert _run_search(runtime.service, SearchAssetsRequest(query="ocean", tags=("unrelated",))).total == 0

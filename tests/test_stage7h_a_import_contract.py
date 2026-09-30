@@ -9,6 +9,13 @@ import traceback
 from dataclasses import fields, replace
 from datetime import datetime, timezone
 
+import json
+from dataclasses import asdict
+from test_metadata_normalization import UNICODE_CASES
+from remember_me.core.normalization import tag_comparison_key
+from remember_me.mcp.schemas import asset_to_public_dict
+from remember_me.standalone.schemas import asset_to_public_response
+
 import pytest
 from PIL import Image
 
@@ -1601,3 +1608,60 @@ def test_acceptance_same_id_different_content_has_a_real_race(
         request.stored_sha256 for request in requests
     }
     assert not list(first.blob_store.temp_root.iterdir())
+
+
+@pytest.mark.parametrize("spelling,counterpart,key", UNICODE_CASES)
+def test_unicode_import_public_roundtrip_timestamps_and_identity(tmp_path, spelling, counterpart, key):
+    runtime = create_local_runtime(tmp_path / "first")
+    request = _request(title=spelling, description=spelling,
+        original_filename=spelling + ".png",
+        tags=(ImportAssetTag("z", UPDATED), ImportAssetTag(spelling, TAG_CREATED)))
+    result = runtime.service.import_asset(request)
+    assert result.asset.title == result.asset.description == spelling
+    assert result.asset.original_filename == spelling + ".png"
+    assert result.tags == tuple(sorted(request.tags, key=lambda tag: tag_comparison_key(tag.value)))
+    with runtime.repository._connect() as connection:
+        assert tuple(connection.execute(
+            "SELECT tag_normalized, tag_display, created_at FROM asset_tags WHERE tag_normalized = ?", (key,)
+        ).fetchone()) == (key, spelling, TAG_CREATED)
+    for public in (asset_to_public_dict(result.asset), asset_to_public_response(result.asset).model_dump()):
+        assert public["title"] == public["description"] == spelling
+        assert public["original_filename"] == spelling + ".png"
+        assert spelling in public["tags"]
+    # Public metadata representation, not a new export API.
+    exported = asdict(request)
+    content = exported.pop("cleaned_bytes")
+    transported = json.loads(json.dumps(exported, ensure_ascii=False))
+    transported["tags"] = tuple(ImportAssetTag(**tag) for tag in transported["tags"])
+    restored = ImportAssetRequest(cleaned_bytes=content, **transported)
+    second = create_local_runtime(tmp_path / "second").service.import_asset(restored)
+    assert second.asset == result.asset
+    assert second.tags == result.tags
+    assert runtime.service.import_asset(restored).disposition is ImportAssetDisposition.SKIPPED_IDEMPOTENT
+    with pytest.raises(AssetIdConflict):
+        runtime.service.import_asset(replace(request, title=counterpart))
+    with pytest.raises(AssetIdConflict):
+        runtime.service.import_asset(replace(request, tags=(ImportAssetTag(counterpart, TAG_CREATED), ImportAssetTag("z", UPDATED))))
+    with pytest.raises(StoredShaOwnershipConflict):
+        runtime.service.import_asset(replace(request, asset_id="b" * 32, title=counterpart))
+    assert runtime.blob_store.read(result.asset.stored_relpath) == content
+    assert (result.asset.asset_id, result.asset.source_sha256, result.asset.stored_sha256) == (
+        request.asset_id, request.source_sha256, request.stored_sha256,
+    )
+    old = create_local_runtime(tmp_path / "old").service.import_asset(replace(request,
+        title=counterpart, description=counterpart, original_filename=counterpart + ".png",
+        tags=(ImportAssetTag(counterpart, TAG_CREATED),)))
+    assert old.asset.title == counterpart
+
+
+@pytest.mark.parametrize("tags", [
+    (ImportAssetTag("Ａ", TAG_CREATED), ImportAssetTag("A", UPDATED)),
+    (ImportAssetTag("Straße", TAG_CREATED), ImportAssetTag("STRASSE", UPDATED)),
+    (ImportAssetTag("a，b", TAG_CREATED), ImportAssetTag("a,b", UPDATED)),
+])
+def test_import_canonical_tag_collision_rejected_without_writes(tmp_path, tags):
+    runtime = create_local_runtime(tmp_path)
+    with pytest.raises(ImportMetadataValidationError):
+        runtime.service.import_asset(_request(tags=tags))
+    assert _counts(runtime.repository) == (0, 0, 0)
+    assert not _stored_files(runtime.blob_store)
