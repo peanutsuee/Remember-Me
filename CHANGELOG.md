@@ -2,10 +2,12 @@
 
 ## 0.1.0
 
-Planned for GitHub Release `v0.1.0` only, with a self-built and validated
-`remember_me-0.1.0.tar.gz` source distribution; no PyPI publication. This
-early 0.x version does not promise long-term API stability. GitHub's automatic
-source archives are not targets for the later OB pin.
+Planned for GitHub Release `v0.1.0` only; no PyPI publication. Remember-Me
+maintainers build and validate `remember_me-0.1.0.tar.gz` from the final
+release commit and upload it as a GitHub Release asset. A later OB integration
+pins that asset's download URL and SHA-256, and OB deployment does not rebuild
+RM. GitHub's automatically generated Source code archives are not pin targets.
+This early 0.x version does not promise long-term API stability.
 
 - Preserve safely cleaned Unicode metadata spelling in storage and public
   responses. NFKC is used for comparison, search, filtering, and tag identity;

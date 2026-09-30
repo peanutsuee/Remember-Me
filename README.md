@@ -122,9 +122,11 @@ service = create_local_service("./remember-me-data")
 
 这些版本独立演进。HTTP API、Dashboard 和 MCP API 都是开发阶段契约，不承诺长期稳定性。
 
-`0.1.0` 计划仅通过 GitHub Release 的 `v0.1.0` 发布，不上传 PyPI。供后续
-OB 固定的是自行构建并验证的 `remember_me-0.1.0.tar.gz`，不是 GitHub
-自动生成的源码包。
+`0.1.0` 计划仅通过 GitHub Release 的 `v0.1.0` 发布，不上传 PyPI。
+Remember-Me 发布方从最终 release commit 构建并验证
+`remember_me-0.1.0.tar.gz`，将其作为 GitHub Release asset 上传。后续 OB
+固定该 Release asset 的下载 URL 与 SHA-256；OB 部署时直接安装该归档，
+不重新构建 RM。不使用 GitHub 自动生成的 Source code 归档。
 
 Pillow 版本范围不会改变 `ombre-brain-assets-v1`、sanitizer 行为、hash 算法、content-addressed paths 或 public API contracts。升级固定的生产 Pillow 版本前，请重新验证图像输出。
 

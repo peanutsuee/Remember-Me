@@ -80,8 +80,10 @@ historical spelling restoration or data migration. See
 [data compatibility](data-compatibility.md) for import and downgrade boundaries.
 
 The release channel for `0.1.0` is GitHub Release only; do not publish it to
-PyPI. Attach the self-built, installed, and validated
-`remember_me-0.1.0.tar.gz` source distribution to the `v0.1.0` release.
-GitHub's automatically generated source archives are not OB pin targets. A
-later OB integration should pin the exact validated source distribution by
-SHA-256 and record its release URL, commit, tree, version, and provenance.
+PyPI. Remember-Me maintainers build and validate the custom
+`remember_me-0.1.0.tar.gz` source distribution from the final release commit,
+then upload it as a GitHub Release asset under `v0.1.0`. Record the commit,
+tree, package version, asset download URL, SHA-256, and provenance. A later OB
+integration pins that exact Release asset URL and SHA-256. OB deployment
+installs the asset without rebuilding RM. GitHub's automatically generated
+Source code archives are not OB pin targets.

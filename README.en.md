@@ -163,8 +163,11 @@ These versions evolve independently. The HTTP API, Dashboard, and MCP API
 remain development contracts without a long-term stability promise.
 
 `0.1.0` is planned for GitHub Release only under tag `v0.1.0`; it will not be
-published to PyPI. A later OB integration should pin the self-built and
-validated `remember_me-0.1.0.tar.gz`, not GitHub's automatic source archives.
+published to PyPI. Remember-Me maintainers build and validate
+`remember_me-0.1.0.tar.gz` from the final release commit and upload it as a
+GitHub Release asset. A later OB integration pins that asset's download URL
+and SHA-256; OB deployment installs the asset without rebuilding RM. GitHub's
+automatically generated Source code archives are not pin targets.
 
 The Pillow range does not change `ombre-brain-assets-v1`, sanitizer behavior,
 hash algorithms, content-addressed paths, or public API contracts. Revalidate
