@@ -15,7 +15,8 @@ SDK v1 requires Python 3.10+.
 
 ## Stage 7H-A status
 
-The current package version is `0.1.0.dev7`. The privacy-safe image core,
+The current package version is `0.1.0`. This early 0.x release does not
+promise long-term API stability. The privacy-safe image core,
 Standalone HTTP Host, original local Dashboard, and public Standalone MCP
 server are implemented for local development.
 
@@ -152,7 +153,7 @@ The caller owns process lifecycle, access control, and backup policy.
 
 ## Version dimensions
 
-- Python package: `0.1.0.dev7`
+- Python package: `0.1.0`
 - HTTP API: `v1alpha1`, routes under `/api/v1`
 - Dashboard: `v1alpha1`
 - MCP API: `v1alpha1`, Streamable HTTP at `/mcp`
@@ -160,6 +161,13 @@ The caller owns process lifecycle, access control, and backup policy.
 
 These versions evolve independently. The HTTP API, Dashboard, and MCP API
 remain development contracts without a long-term stability promise.
+
+`0.1.0` is planned for GitHub Release only under tag `v0.1.0`; it will not be
+published to PyPI. Remember-Me maintainers build and validate
+`remember_me-0.1.0.tar.gz` from the final release commit and upload it as a
+GitHub Release asset. A later OB integration pins that asset's download URL
+and SHA-256; OB deployment installs the asset without rebuilding RM. GitHub's
+automatically generated Source code archives are not pin targets.
 
 The Pillow range does not change `ombre-brain-assets-v1`, sanitizer behavior,
 hash algorithms, content-addressed paths, or public API contracts. Revalidate
@@ -250,3 +258,27 @@ Dashboard HTML, CSS, JavaScript, layout, visual system, authentication, Cookie,
 CSRF, MCP, transfer, Viewer, or tool-registration code was read or copied.
 See `NOTICE`,
 `LICENSES/MIT-Ombre-Brain.txt`, and `docs/source-provenance.md`.
+
+## Unicode metadata and semantic search
+
+`0.1.0` preserves safely cleaned metadata spelling without NFC or
+NFKC storage/display rewriting. Comparison, tag identity, search and filtering
+use separate NFKC canonical keys. Schema and blob/hash identity are unchanged;
+there is no historical spelling restoration or migration. Import preserves
+spelling and timestamps but rejects canonical tag collisions. Older import and
+search implementations may not support new spelling. See
+[data compatibility](docs/data-compatibility.md).
+
+With an injected vector provider, pure semantic matches require a cosine score
+of at least `0.42` by default. Keyword matches remain; a score below the
+threshold adds neither a `semantic` reason nor `semantic_score`. Core callers
+may set `semantic_min_score` in `create_local_runtime(...)` or
+`create_local_service(...)` to a finite value in `[0, 1]`. Explicit `0` keeps
+the former positive-score behavior. No match succeeds with `total=0` and
+`results=[]`. The default `NullVectorProvider` remains keyword-only.
+
+Reindex validates a new vector and checks the asset and provider state before
+atomically replacing the old record. Generation failure or cancellation keeps
+the old record. Explicit no-text and disabled-provider cleanup remains
+synchronous. Batches process each asset independently and retries skip records
+already current. See the [Core contract](docs/public-api-contract.md).

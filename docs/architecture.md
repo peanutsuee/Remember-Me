@@ -56,6 +56,11 @@ operation. The SQLite repository owns embedding read, delete, and transactional
 conditional-store capabilities using the existing compatible table. The
 Standalone MCP adapter delegates to that operation and only translates the
 Core result into its established public envelope.
+Reindex now awaits and validates a replacement before the conditional upsert;
+the old embedding remains stored if generation, validation, snapshot checking,
+or persistence fails. A cancelled await propagates without deleting it. No-text
+and disabled-provider cleanup remain synchronous branches. Each asset commits
+independently, so a later failure does not roll back earlier completed assets.
 
 Stage 7G-B makes semantic search consumption a Core responsibility. When an
 enabled asynchronous provider is injected, Core embeds the query once, derives
@@ -65,6 +70,11 @@ same dimension. The model identity must remain unchanged across the query
 embedding await. Core computes dependency-free cosine similarity and delegates
 final filtering and stable ranking over the same immutable asset snapshot to
 the existing keyword search contract.
+Core applies its configurable positive semantic minimum before combining
+candidates, computing total, or paginating. The default is `0.42`; a finite
+`[0, 1]` override is accepted by the Core constructor and local factories.
+Explicit `0` keeps the earlier positive-score admission rule. Low scores never
+add a semantic reason or score to keyword hits.
 Invalid queries, provider failures, corrupt individual vectors, dimension
 mismatches, and zero-norm vectors safely degrade to keyword-only behavior;
 cancellation and whole-repository failures still propagate. Search never

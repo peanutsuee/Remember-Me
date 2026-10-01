@@ -29,6 +29,7 @@ from remember_me.core.normalization import (
     normalize_description,
     normalize_tags,
     normalize_title,
+    tag_comparison_key,
 )
 from remember_me.core.vector_index import validate_stored_embedding_vector
 from remember_me.search.keyword import keyword_search
@@ -232,7 +233,7 @@ class SQLiteAssetRepository:
                         "VALUES (?, ?, ?, ?)",
                         (
                             normalized.asset_id,
-                            display.casefold(),
+                            tag_comparison_key(display),
                             display,
                             normalized.created_at,
                         ),
@@ -259,7 +260,7 @@ class SQLiteAssetRepository:
                         "VALUES (?, ?, ?, ?)",
                         (
                             asset.asset_id,
-                            tag.value.casefold(),
+                            tag_comparison_key(tag.value),
                             tag.value,
                             tag.created_at,
                         ),
@@ -380,8 +381,8 @@ class SQLiteAssetRepository:
                 replace_tags = False
                 if request.tags is not None:
                     proposed = normalize_tags(request.tags)
-                    if tuple(tag.casefold() for tag in proposed) != tuple(
-                        tag.casefold() for tag in current.tags
+                    if tuple(tag_comparison_key(tag) for tag in proposed) != tuple(
+                        tag_comparison_key(tag) for tag in current.tags
                     ):
                         tags = proposed
                         replace_tags = True
@@ -410,7 +411,7 @@ class SQLiteAssetRepository:
                             "VALUES (?, ?, ?, ?)",
                             (
                                 current.asset_id,
-                                display.casefold(),
+                                tag_comparison_key(display),
                                 display,
                                 updated_at,
                             ),

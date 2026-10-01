@@ -32,8 +32,7 @@ Package version `0.1.0.dev7` adds four synchronous, read-only Core operations
 for bounded verification of one local asset target. They are generic Core
 capabilities and are not part of Search, Reindex, HTTP, MCP, or any
 host-specific workflow. The immutable release commit and archive digest will
-be determined by the later release stage; this development tree does not
-declare either value.
+be recorded with the release provenance after the final artifact is built.
 
 `begin_asset_verification` creates a short-lived generation-guarded session.
 The result contains an unpredictable opaque snapshot token, a persistent
@@ -195,6 +194,17 @@ cleanup, per-asset counters, vector validation, and conditional persistence.
 The repository exposes embedding read, delete, and transactionally guarded
 store operations using the existing compatible schema. A host may inject an
 async provider, while the default factory continues to use the null provider.
+Reindex creates and validates the replacement vector before the repository's
+transactional conditional upsert. Provider failure, invalid output, a changed
+asset or model, or cancellation leaves the previous embedding record intact.
+Explicit no-text and disabled-provider branches may remove a vector without an
+await. Successful replacement increments `indexed`; an already current record
+or successful no-vector cleanup increments `skipped`; an unsuccessful attempt
+increments `failed`. For a returned batch result, `scanned` equals the sum of
+those three counters. Cancellation propagates without inventing a batch result;
+earlier per-asset commits remain and a retry skips records already current.
+Retries are state-idempotent, not a promise that an external provider is called
+exactly once.
 
 Stage 7G-B makes `search_assets` asynchronous and Core-owned for semantic
 orchestration. Direct Python callers must now use
@@ -213,8 +223,13 @@ after query embedding; a change causes exact keyword fallback before any stored
 vector read.
 
 The baseline keyword ranking remains authoritative: keyword ranks precede pure
-semantic rank 6, and only a strictly positive cosine creates a semantic match.
-Zero or negative cosine values do not create pure semantic candidates. Current
+semantic rank 6. The Core default `semantic_min_score` is `0.42`; callers may
+override it in the service constructor or local factory with a finite number
+in `[0, 1]`. Explicit `0` retains the previous strictly positive-score rule.
+Only scores that are positive and at least the configured minimum add a
+semantic candidate or semantic reason and score to a keyword match. Filtering
+precedes merge, total, and pagination; a keyword match survives a low semantic
+score, and no match returns `total=0` and empty results. Current
 hash checks and final ranking use one immutable asset snapshot. This is a
 per-search read snapshot, not a cross-table serializable transaction; metadata
 committed after the snapshot appears on the next search.
@@ -228,6 +243,8 @@ envelope remain authoritative. The default Standalone factory still injects
 `NullVectorProvider`, so it remains keyword-only and performs no network
 access. Hosts may inject an async provider; Remember-Me includes no real network
 provider.
+No search request field, MCP parameter, HTTP query parameter, environment
+variable, or public result field is added for the threshold.
 
 ## Trusted import contract
 

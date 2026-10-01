@@ -87,6 +87,14 @@ def _run(service, request=None):
     )
 
 
+def _store_stale(repository, asset):
+    repository.store_embedding(
+        asset.asset_id, [0.75, 0.25], "test/old-model", "f" * 64,
+        asset.updated_at,
+    )
+    return repository.get_embedding(asset.asset_id)
+
+
 def _assert_counters(result):
     assert result.scanned == result.indexed + result.skipped + result.failed
 
@@ -173,6 +181,165 @@ def test_metadata_and_model_changes_rebuild_stale_records(tmp_path):
     assert runtime.repository.get_embedding(asset.asset_id).model_id == (
         "test/provider-v2"
     )
+
+
+def test_stale_vector_is_replaced_only_after_success_and_retry_skips(tmp_path):
+    runtime = _runtime(tmp_path)
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+
+    def while_embedding(_text):
+        assert runtime.repository.get_embedding(asset.asset_id) == old
+
+    provider = RecordingProvider(callback=while_embedding)
+    runtime.service.vector_provider = provider
+    first = _run(runtime.service, ReindexEmbeddingsRequest(asset_id=asset.asset_id))
+    assert (first.scanned, first.indexed, first.skipped, first.failed) == (1, 1, 0, 0)
+    new = runtime.repository.get_embedding(asset.asset_id)
+    assert new is not None and new != old
+    assert new.model_id == provider.model_id
+    second = _run(runtime.service, ReindexEmbeddingsRequest(asset_id=asset.asset_id))
+    assert (second.scanned, second.indexed, second.skipped, second.failed) == (1, 0, 1, 0)
+    assert runtime.repository.get_embedding(asset.asset_id) == new
+    assert len(provider.calls) == 1
+
+
+@pytest.mark.parametrize("result", [
+    RuntimeError("provider unavailable"), [], [float("nan")],
+])
+def test_provider_failure_or_invalid_vector_keeps_stale_vector(tmp_path, result):
+    runtime = _runtime(tmp_path, RecordingProvider(result=result))
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+    outcome = _run(runtime.service)
+    assert (outcome.scanned, outcome.indexed, outcome.skipped, outcome.failed) == (1, 0, 0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_model_change_during_embed_keeps_stale_vector(tmp_path):
+    class SwitchingProvider(RecordingProvider):
+        async def embed(self, text):
+            self.calls.append(text)
+            self.model_id = "test/provider-v2"
+            return [0.25, -0.5]
+
+    runtime = _runtime(tmp_path, SwitchingProvider())
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+    outcome = _run(runtime.service)
+    assert (outcome.indexed, outcome.failed) == (0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_provider_swap_during_embed_keeps_stale_vector(tmp_path):
+    runtime = _runtime(tmp_path)
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+    replacement = RecordingProvider()
+    runtime.service.vector_provider = RecordingProvider(
+        callback=lambda _text: setattr(runtime.service, "vector_provider", replacement)
+    )
+    outcome = _run(runtime.service)
+    assert (outcome.indexed, outcome.failed) == (0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_provider_state_failure_keeps_stale_vector(tmp_path):
+    class BrokenProvider:
+        @property
+        def enabled(self):
+            raise RuntimeError("provider state unavailable")
+
+        @property
+        def model_id(self):
+            return "test/provider-v1"
+
+        async def embed(self, _text):
+            raise AssertionError("must not embed with unknown provider state")
+
+    runtime = _runtime(tmp_path, BrokenProvider())
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+    outcome = _run(runtime.service)
+    assert (outcome.indexed, outcome.failed) == (0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_asset_change_during_embed_keeps_stale_vector(tmp_path):
+    runtime = _runtime(tmp_path)
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+    runtime.service.vector_provider = RecordingProvider(
+        callback=lambda _text: runtime.repository.update_metadata(
+            UpdateMetadataRequest(asset_id=asset.asset_id, title="Changed"),
+            asset.updated_at,
+        )
+    )
+    outcome = _run(runtime.service)
+    assert (outcome.indexed, outcome.failed) == (0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_conditional_store_failure_keeps_stale_vector(tmp_path, monkeypatch):
+    from remember_me.core import StorageFailure
+
+    runtime = _runtime(tmp_path)
+    asset = runtime.repository.add(_asset())
+    old = _store_stale(runtime.repository, asset)
+
+    def fail_store(_asset, _record):
+        raise StorageFailure()
+
+    monkeypatch.setattr(runtime.repository, "store_embedding_if_asset_current", fail_store)
+    outcome = _run(runtime.service)
+    assert (outcome.indexed, outcome.failed) == (0, 1)
+    assert runtime.repository.get_embedding(asset.asset_id) == old
+
+
+def test_real_task_cancellation_preserves_later_old_vector_and_retry_counts(tmp_path):
+    runtime = _runtime(tmp_path)
+    first = runtime.repository.add(_asset(asset_id="a" * 32, title="First"))
+    second = runtime.repository.add(_asset(
+        asset_id="c" * 32, stored_sha256="c" * 64, title="Second",
+    ))
+    _store_stale(runtime.repository, first)
+    second_old = _store_stale(runtime.repository, second)
+
+    async def cancel_in_second_await():
+        second_started = asyncio.Event()
+
+        class BlockingProvider(RecordingProvider):
+            async def embed(self, text):
+                self.calls.append(text)
+                if "Second" in text:
+                    second_started.set()
+                    await asyncio.Event().wait()
+                return [0.25, -0.5]
+
+        runtime.service.vector_provider = BlockingProvider()
+        task = asyncio.create_task(runtime.service.reindex_embeddings(
+            ReindexEmbeddingsRequest(limit=2),
+        ))
+        await asyncio.wait_for(second_started.wait(), timeout=5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(cancel_in_second_await())
+    first_new = runtime.repository.get_embedding(first.asset_id)
+    assert first_new is not None and first_new.model_id == "test/provider-v1"
+    assert runtime.repository.get_embedding(second.asset_id) == second_old
+
+    retry_provider = RecordingProvider()
+    runtime.service.vector_provider = retry_provider
+    retry = _run(runtime.service, ReindexEmbeddingsRequest(limit=2))
+    assert (retry.scanned, retry.indexed, retry.skipped, retry.failed) == (2, 1, 1, 0)
+    assert len(retry_provider.calls) == 1
+    assert "Second" in retry_provider.calls[0]
+    assert runtime.repository.get_embedding(first.asset_id) == first_new
+    assert runtime.repository.get_embedding(second.asset_id).model_id == "test/provider-v1"
+    with runtime.repository._connect() as connection:
+        assert connection.execute("SELECT count(*) FROM asset_embeddings").fetchone()[0] == 2
 
 
 def test_empty_user_metadata_deletes_embedding_and_skips(tmp_path):
@@ -428,7 +595,7 @@ def test_mcp_reindex_delegates_once_and_preserves_output(tmp_path, enabled):
     }
     assert payload["selected"] == 3
     assert payload["indexed"] == (2 if enabled else 0)
-    assert payload["failed"] == (1 if enabled else 0)
+    assert payload["failed"] == core_result.failed
 
 
 def test_mcp_reindex_error_envelope_does_not_leak_provider_details(tmp_path):
@@ -557,8 +724,8 @@ def test_acceptance_disabled_provider_four_quadrants(tmp_path):
     assert (result.scanned, result.indexed, result.skipped, result.failed) == (
         4,
         0,
-        2,
-        2,
+        4,
+        0,
     )
     assert runtime.repository.get_embedding(current.asset_id) is not None
     assert runtime.repository.get_embedding(missing.asset_id) is None
@@ -676,7 +843,7 @@ def test_acceptance_repository_read_or_store_failure_isolated(
 def test_acceptance_repository_delete_failure_isolated(tmp_path, monkeypatch):
     from remember_me.core import StorageFailure
 
-    runtime = _runtime(tmp_path)
+    runtime = _runtime(tmp_path, NullVectorProvider())
     first = runtime.repository.add(_asset(asset_id="a" * 32, title="First"))
     second = runtime.repository.add(
         _asset(asset_id="c" * 32, stored_sha256="c" * 64, title="Second")
@@ -698,9 +865,9 @@ def test_acceptance_repository_delete_failure_isolated(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runtime.repository, "delete_embedding", fail_first)
     result = _run(runtime.service)
-    assert (result.scanned, result.indexed, result.failed) == (2, 1, 1)
+    assert (result.scanned, result.indexed, result.skipped, result.failed) == (2, 0, 1, 1)
     assert runtime.repository.get_embedding(first.asset_id) is not None
-    assert runtime.repository.get_embedding(second.asset_id) is not None
+    assert runtime.repository.get_embedding(second.asset_id) is None
 
 
 @pytest.mark.parametrize("limit", [False, 1.0, "10"])

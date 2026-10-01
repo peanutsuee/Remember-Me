@@ -88,9 +88,9 @@ def _public_text_files():
 
 
 def test_stage7b_version_and_readme_status():
-    assert remember_me.__version__ == "0.1.0.dev7"
+    assert remember_me.__version__ == "0.1.0"
     readme = _read("README.md")
-    assert "`0.1.0.dev7`" in readme
+    assert "`0.1.0`" in readme
     assert "privacy-safe image core" in readme
     assert "not deployable as a complete" in readme
     for name in ["Dashboard", "HTTP", "MCP", "Standalone Host"]:

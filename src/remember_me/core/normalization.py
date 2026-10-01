@@ -16,16 +16,21 @@ _CONTROL_CATEGORIES = {"Cc", "Cf"}
 def _clean_text(value, *, maximum, error_type):
     if type(value) is not str:
         raise error_type()
-    normalized = unicodedata.normalize("NFKC", value)
-    normalized = "".join(
+    # Display spelling and comparison spelling have separate responsibilities.
+    cleaned = _clean_display(value)
+    # Keep the old expansion limit as well as the stored-value limit.
+    if len(cleaned) > maximum or len(_clean_scalar(value)) > maximum:
+        raise error_type()
+    return cleaned
+
+
+def _clean_display(value: str) -> str:
+    cleaned = "".join(
         " " if unicodedata.category(character) in _CONTROL_CATEGORIES
         else character
-        for character in normalized
+        for character in value
     )
-    normalized = _WHITESPACE.sub(" ", normalized).strip()
-    if len(normalized) > maximum:
-        raise error_type()
-    return normalized
+    return _WHITESPACE.sub(" ", cleaned).strip()
 
 
 def normalize_title(value: str) -> str:
@@ -70,7 +75,7 @@ def normalize_tags(values) -> tuple[str, ...]:
         display = _clean_tag(value, InvalidMetadata)
         if not display:
             continue
-        identity = display.casefold()
+        identity = tag_comparison_key(display)
         first_display.setdefault(identity, display)
     if len(first_display) > 30:
         raise InvalidMetadata()
@@ -80,13 +85,12 @@ def normalize_tags(values) -> tuple[str, ...]:
 def _clean_scalar(value) -> str:
     if type(value) is not str:
         return ""
-    normalized = unicodedata.normalize("NFKC", value)
-    normalized = "".join(
-        " " if unicodedata.category(character) in _CONTROL_CATEGORIES
-        else character
-        for character in normalized
-    )
-    return _WHITESPACE.sub(" ", normalized).strip()
+    return _clean_display(unicodedata.normalize("NFKC", value))
+
+
+def tag_comparison_key(value: str) -> str:
+    """Compatibility identity; never use this value as a display spelling."""
+    return _clean_scalar(value).casefold()
 
 
 def _normalize_tags(values) -> tuple[str, ...]:
@@ -104,7 +108,7 @@ def validate_import_tags(values) -> tuple[tuple[str, str], ...]:
         display = _clean_tag(value, ImportMetadataValidationError)
         if not display or display != value:
             raise ImportMetadataValidationError()
-        identity = display.casefold()
+        identity = tag_comparison_key(display)
         if identity in identities:
             raise ImportMetadataValidationError()
         identities[identity] = display
@@ -116,10 +120,19 @@ def validate_import_tags(values) -> tuple[tuple[str, str], ...]:
 def normalize_filename(value: str) -> str:
     if type(value) is not str:
         raise InvalidMetadata()
-    filename = unicodedata.normalize("NFKC", value)
-    if filename.startswith("../"):
-        filename = "_" + filename[3:]
-    safe = filename.replace("/", "_").replace("\\", "_")
+    filename = value
+    # A compatibility copy keeps the existing path checks effective without
+    # rewriting safe filename spelling. Only unsafe separators are replaced.
+    if unicodedata.normalize("NFKC", filename).startswith("../"):
+        for end in range(1, len(filename) + 1):
+            if len(unicodedata.normalize("NFKC", filename[:end])) >= 3:
+                filename = "_" + filename[end:]
+                break
+    safe = "".join(
+        "_" if any(separator in unicodedata.normalize("NFKC", character)
+                   for separator in ("/", "\\")) else character
+        for character in filename
+    )
     safe = "".join(
         "_" if unicodedata.category(character) in _CONTROL_CATEGORIES
         else character
@@ -137,7 +150,7 @@ def validate_import_filename(value: str) -> str:
         or not value
         or "/" in value
         or "\\" in value
-        or value in {".", ".."}
+        or unicodedata.normalize("NFKC", value) in {".", ".."}
         or normalize_filename(value) != value
     ):
         raise ImportMetadataValidationError()
@@ -151,6 +164,7 @@ __all__ = [
     "normalize_import_title",
     "normalize_tags",
     "normalize_title",
+    "tag_comparison_key",
     "validate_import_filename",
     "validate_import_tags",
 ]

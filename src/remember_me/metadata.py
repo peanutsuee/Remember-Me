@@ -2,7 +2,7 @@
 """Canonical public identity metadata for Remember-Me."""
 
 PROJECT_NAME = "Remember-Me"
-PROJECT_VERSION = "0.1.0.dev7"
+PROJECT_VERSION = "0.1.0"
 HTTP_API_VERSION = "v1alpha1"
 HTTP_ROUTE_PREFIX = "/api/v1"
 DASHBOARD_VERSION = "v1alpha1"

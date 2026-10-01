@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: CPAL-1.0
 from __future__ import annotations
 
+from test_metadata_normalization import UNICODE_CASES
+
 import asyncio
 import json
 import math
@@ -17,6 +19,7 @@ from remember_me.core import (
     EmbeddingRecord,
     IngestImageRequest,
     ReindexEmbeddingsRequest,
+    RememberMeService,
     SearchAssetsRequest,
     SearchAssetsResult,
     SearchResultItem,
@@ -29,7 +32,7 @@ from remember_me.core.vector_index import (
     index_content_hash,
     validate_embedding_vector,
 )
-from remember_me.factory import create_local_runtime
+from remember_me.factory import create_local_runtime, create_local_service
 from remember_me.mcp.server import MCP_TOOL_NAMES, create_mcp_runtime
 from remember_me.search import NullVectorProvider
 from remember_me.standalone.config import StandaloneConfig
@@ -476,6 +479,78 @@ def test_keyword_ties_do_not_use_semantic_score_as_a_hidden_weight(tmp_path):
     assert result.results[0].semantic_score < result.results[1].semantic_score
 
 
+def test_default_threshold_filters_before_merge_count_and_pages(tmp_path, monkeypatch):
+    runtime = create_local_runtime(tmp_path, vector_provider=QueryProvider())
+    assert runtime.service.semantic_min_score == 0.42
+    keyword = runtime.repository.add(_asset("a" * 32, title="Ocean"))
+    low = runtime.repository.add(_asset("b" * 32, title="Low"))
+    boundary = runtime.repository.add(_asset("c" * 32, title="Boundary"))
+    high = runtime.repository.add(_asset("d" * 32, title="High"))
+    for asset, score in ((keyword, 0.41), (low, 0.41),
+                         (boundary, 0.42), (high, 0.9)):
+        _store_current(runtime.repository, asset, (score, 1.0))
+    monkeypatch.setattr(
+        "remember_me.core.service.cosine_similarity",
+        lambda _query, stored: stored[0],
+    )
+    pages = [
+        _run_search(runtime.service, SearchAssetsRequest(
+            query="ocean", limit=1, offset=offset,
+        ))
+        for offset in range(4)
+    ]
+    assert all(page.total == 3 for page in pages)
+    assert [page.results[0].asset.asset_id for page in pages[:3]] == [
+        keyword.asset_id, high.asset_id, boundary.asset_id,
+    ]
+    assert pages[3].results == ()
+    assert pages[0].results[0].match_reasons == ("title_exact",)
+    assert pages[0].results[0].semantic_score is None
+    assert [page.results[0].semantic_score for page in pages[1:3]] == [0.9, 0.42]
+    assert all(page.results[0].match_reasons == ("semantic",)
+               for page in pages[1:3])
+
+
+def test_threshold_zero_preserves_positive_score_and_no_match_is_success(
+    tmp_path, monkeypatch,
+):
+    provider = QueryProvider()
+    runtime = create_local_runtime(
+        tmp_path, vector_provider=provider, semantic_min_score=0,
+    )
+    low = runtime.repository.add(_asset("a" * 32, title="Low"))
+    _store_current(runtime.repository, low, (0.01, 1.0))
+    monkeypatch.setattr(
+        "remember_me.core.service.cosine_similarity",
+        lambda _query, stored: stored[0],
+    )
+    request = SearchAssetsRequest(query="ocean")
+    assert _run_search(runtime.service, request).results[0].semantic_score == 0.01
+    filtered = create_local_runtime(
+        tmp_path, vector_provider=provider, semantic_min_score=0.42,
+    )
+    result = _run_search(filtered.service, request)
+    assert (result.total, result.results) == (0, ())
+    assert (result.offset, result.limit) == (0, 20)
+    tool = create_mcp_runtime(
+        filtered, StandaloneConfig(data_root=tmp_path),
+    ).server._tool_manager.get_tool("rm_asset_search").fn
+    response = asyncio.run(tool(query="ocean"))
+    assert response.structuredContent == {
+        "ok": True, "total": 0, "limit": 20, "offset": 0, "items": [],
+    }
+    assert create_local_service(tmp_path / "service", semantic_min_score=1).semantic_min_score == 1
+
+
+@pytest.mark.parametrize("value", [
+    None, True, False, "0.42", -0.01, 1.01,
+    float("nan"), float("inf"), float("-inf"), 10 ** 1000,
+])
+def test_threshold_rejects_invalid_configuration(value):
+    with pytest.raises(ValueError, match="invalid_semantic_min_score"):
+        RememberMeService(None, None, None, None, QueryProvider(), value)
+
+
 def test_current_hash_and_final_ranking_share_one_asset_snapshot(
     tmp_path,
     monkeypatch,
@@ -693,3 +768,18 @@ def test_mcp_search_contains_no_vector_or_repository_orchestration():
         "cosine_similarity",
     ):
         assert forbidden not in block
+
+
+@pytest.mark.parametrize("spelling,counterpart,key", UNICODE_CASES)
+@pytest.mark.parametrize("reverse", [False, True])
+def test_semantic_metadata_tag_filter_canonicalizes_both_sides(tmp_path, spelling, counterpart, key, reverse):
+    stored, query_tag = (counterpart, spelling) if reverse else (spelling, counterpart)
+    provider = QueryProvider()
+    runtime, asset = _runtime_with_asset(tmp_path, provider, _asset(tags=(stored,)))
+    _store_current(runtime.repository, asset)
+    result = _run_search(runtime.service, SearchAssetsRequest(query="ocean", tags=(query_tag,)))
+    assert result.total == 1
+    assert result.results[0].asset == asset
+    assert result.results[0].match_reasons == ("semantic",)
+    assert provider.calls == ["ocean"]
+    assert _run_search(runtime.service, SearchAssetsRequest(query="ocean", tags=("unrelated",))).total == 0

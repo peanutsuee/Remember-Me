@@ -133,7 +133,7 @@ def test_add_find_update_and_noop_timestamp_semantics(tmp_path):
         ),
         "2026-07-25T01:00:00+00:00",
     )
-    assert updated.title == "RM title"
+    assert updated.title == "ＲＭ title"
     assert updated.description == "中文描述 第二行"
     assert updated.tags == ("Tag", "WORK", "旅行")
     assert updated.updated_at == "2026-07-25T01:00:00+00:00"
@@ -466,3 +466,53 @@ def test_list_for_embedding_uses_compatible_tie_breaker(tmp_path):
     first = repository.add(_asset(asset_id="a" * 32, stored_sha256="a" * 64))
     second = repository.add(_asset(asset_id="b" * 32, stored_sha256="b" * 64))
     assert repository.list_for_embedding() == (first, second)
+
+
+@pytest.mark.parametrize("values,expected", [
+    (("Ａ", "A"), ("Ａ",)),
+    (("A", "Ａ"), ("A",)),
+    (("b", "Ａ", "c"), ("Ａ", "b", "c")),
+])
+def test_compatibility_tag_keys_and_update_representative(tmp_path, values, expected):
+    repository = SQLiteAssetRepository(tmp_path)
+    asset = repository.add(_asset(title="Å", description="e\u0301", tags=values))
+    assert asset.title == "Å"
+    assert asset.description == "e\u0301"
+    assert asset.tags == expected
+    with repository._connect() as connection:
+        rows = connection.execute(
+            "SELECT tag_normalized, tag_display, created_at FROM asset_tags ORDER BY tag_normalized"
+        ).fetchall()
+    assert [tuple(row)[:2] for row in rows] == [(v.casefold(), d) for v, d in zip(
+        ("a", "b", "c") if len(expected) == 3 else ("a",), expected)]
+    same = repository.update_metadata(
+        UpdateMetadataRequest(asset_id=asset.asset_id, tags=tuple("A" if t == "Ａ" else t for t in expected)),
+        "2026-07-25T01:00:00+00:00",
+    )
+    assert same == asset
+    with repository._connect() as connection:
+        assert [tuple(row) for row in connection.execute(
+            "SELECT tag_normalized, tag_display, created_at FROM asset_tags ORDER BY tag_normalized"
+        )] == [tuple(row) for row in rows]
+    changed = repository.update_metadata(
+        UpdateMetadataRequest(asset_id=asset.asset_id, tags=("c", "Ａ", "A", "b", "d")),
+        "2026-07-25T02:00:00+00:00",
+    )
+    assert changed.tags == ("Ａ", "b", "c", "d")
+    assert repository.get(asset.asset_id) == changed
+    assert changed.updated_at == "2026-07-25T02:00:00+00:00"
+    with repository._connect() as connection:
+        assert {row[0] for row in connection.execute(
+            "SELECT created_at FROM asset_tags"
+        )} == {changed.updated_at}
+
+
+def test_existing_normalized_metadata_is_read_and_searched_without_rewrite(tmp_path):
+    repository = SQLiteAssetRepository(tmp_path)
+    original = repository.add(_asset(title="ABC", description="fi", tags=("A",)))
+    before = (tmp_path / "assets.sqlite3").read_bytes()
+    reopened = SQLiteAssetRepository(tmp_path)
+    assert reopened.get(original.asset_id) == original
+    assert reopened.search(SearchAssetsRequest(query="ＡＢＣ", tags=("Ａ",))).total == 1
+    assert reopened.search(SearchAssetsRequest(query="ﬁ")).total == 1
+    assert (tmp_path / "assets.sqlite3").read_bytes() == before

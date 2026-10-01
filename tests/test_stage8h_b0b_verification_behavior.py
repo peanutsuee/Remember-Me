@@ -178,7 +178,7 @@ def test_public_contract_models_signatures_and_version():
         ) == ("self", "request")
         assert request_type.__module__ == "remember_me.core.models"
         assert result_type.__module__ == "remember_me.core.models"
-    assert PROJECT_VERSION == __version__ == "0.1.0.dev7"
+    assert PROJECT_VERSION == __version__ == "0.1.0"
     assert {
         "get_asset_verification_state",
         "count_assets_for_verification",

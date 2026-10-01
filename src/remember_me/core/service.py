@@ -7,6 +7,7 @@ import asyncio
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 import hashlib
+import math
 import re
 import secrets
 import threading
@@ -77,6 +78,7 @@ from .normalization import (
     normalize_import_title,
     normalize_tags,
     normalize_title,
+    tag_comparison_key,
     validate_import_filename,
     validate_import_tags,
 )
@@ -130,12 +132,24 @@ class RememberMeService:
         image_sanitizer,
         clock,
         vector_provider,
+        semantic_min_score=0.42,
     ):
+        if isinstance(semantic_min_score, bool) or not isinstance(
+            semantic_min_score, (int, float)
+        ):
+            raise ValueError("invalid_semantic_min_score")
+        try:
+            threshold = float(semantic_min_score)
+        except (OverflowError, TypeError, ValueError):
+            raise ValueError("invalid_semantic_min_score") from None
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError("invalid_semantic_min_score")
         self.repository = repository
         self.blob_store = blob_store
         self.image_sanitizer = image_sanitizer
         self.clock = clock
         self.vector_provider = vector_provider
+        self.semantic_min_score = threshold
         self._verification_sessions: dict[str, _VerificationSession] = {}
         self._verification_sessions_lock = threading.RLock()
 
@@ -273,7 +287,9 @@ class RememberMeService:
                 raise ImportMetadataValidationError()
             tag_values.append(tag.value)
         ordered = validate_import_tags(tuple(tag_values))
-        tag_times = {tag.value.casefold(): tag.created_at for tag in request.tags}
+        tag_times = {
+            tag_comparison_key(tag.value): tag.created_at for tag in request.tags
+        }
         tags = tuple(
             ImportAssetTag(display, tag_times[identity])
             for identity, display in ordered
@@ -535,7 +551,11 @@ class RememberMeService:
             ):
                 continue
             score = cosine_similarity(query_vector, record.embedding)
-            if score is not None and score > 0.0:
+            if (
+                score is not None
+                and score > 0.0
+                and score >= self.semantic_min_score
+            ):
                 semantic_scores[asset.asset_id] = score
         combined = []
         for item in keyword.results:
@@ -602,12 +622,28 @@ class RememberMeService:
             if asset is None:
                 raise AssetUnavailable()
             assets = (asset,)
+        provider = self.vector_provider
+        provider_state_failed = False
         try:
-            enabled = bool(self.vector_provider.enabled)
-            model_id = self.vector_provider.model_id
+            enabled = bool(provider.enabled)
+            model_id = provider.model_id
+            if type(model_id) is not str or not model_id.strip():
+                provider_state_failed = True
         except Exception:
+            provider_state_failed = True
             enabled = False
             model_id = ""
+
+        def provider_unchanged():
+            try:
+                return (
+                    self.vector_provider is provider
+                    and bool(provider.enabled) == enabled
+                    and provider.model_id == model_id
+                )
+            except Exception:
+                return False
+
         indexed = skipped = failed = 0
         for asset in assets:
             try:
@@ -620,26 +656,28 @@ class RememberMeService:
                     and existing.content_hash == content_hash
                     and bool(text)
                 )
-                if not enabled:
-                    if current or existing is None:
-                        skipped += 1
-                    else:
-                        self.repository.delete_embedding(asset.asset_id)
-                        failed += 1
-                    continue
                 if not text:
                     if existing is not None:
+                        self.repository.delete_embedding(asset.asset_id)
+                    skipped += 1
+                    continue
+                if provider_state_failed:
+                    failed += 1
+                    continue
+                if not provider_unchanged():
+                    failed += 1
+                    continue
+                if not enabled:
+                    if not current and existing is not None:
                         self.repository.delete_embedding(asset.asset_id)
                     skipped += 1
                     continue
                 if current:
                     skipped += 1
                     continue
-                if existing is not None:
-                    self.repository.delete_embedding(asset.asset_id)
                 try:
                     vector = validate_embedding_vector(
-                        await self.vector_provider.embed(text)
+                        await provider.embed(text)
                     )
                 except asyncio.CancelledError:
                     raise
@@ -647,6 +685,9 @@ class RememberMeService:
                     failed += 1
                     continue
                 if vector is None:
+                    failed += 1
+                    continue
+                if not provider_unchanged():
                     failed += 1
                     continue
                 record = EmbeddingRecord(

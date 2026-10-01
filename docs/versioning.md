@@ -5,8 +5,10 @@ transport contracts evolve at different rates.
 
 ## Python package version
 
-The installable package uses PEP 440. Stage 8H-B0B is `0.1.0.dev7`. Package versions
-describe released code, not the age of pre-existing integrated prototypes.
+The installable package uses PEP 440. The current package version is `0.1.0`;
+its planned GitHub Release tag is `v0.1.0`. This early 0.x release does
+not promise long-term API stability. Package versions describe released code,
+not the age of pre-existing integrated prototypes.
 
 Stage 7F validates `Pillow>=10.4,<13` with Pillow 10.4.0, 11.3.0, and 12.3.0.
 This is a package-runtime compatibility change only. HTTP API, Dashboard, MCP
@@ -67,3 +69,21 @@ Each Remember-Me release that claims Ombre Brain compatibility must record:
 
 Historical private integration labels are not independent Remember-Me package
 versions and must not be used as public release identifiers.
+
+## Current metadata, search and reindex policy
+
+The current package separates storage/display spelling from NFKC comparison
+keys, applies a configurable Core semantic minimum of `0.42` by default, and
+preserves old embeddings until validated replacements are ready. It keeps
+`ombre-brain-assets-v1` and the HTTP and MCP schemas unchanged. There is no
+historical spelling restoration or data migration. See
+[data compatibility](data-compatibility.md) for import and downgrade boundaries.
+
+The release channel for `0.1.0` is GitHub Release only; do not publish it to
+PyPI. Remember-Me maintainers build and validate the custom
+`remember_me-0.1.0.tar.gz` source distribution from the final release commit,
+then upload it as a GitHub Release asset under `v0.1.0`. Record the commit,
+tree, package version, asset download URL, SHA-256, and provenance. A later OB
+integration pins that exact Release asset URL and SHA-256. OB deployment
+installs the asset without rebuilding RM. GitHub's automatically generated
+Source code archives are not OB pin targets.

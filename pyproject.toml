@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "remember-me"
-version = "0.1.0.dev7"
+version = "0.1.0"
 description = "An independent image memory, storage, retrieval, and management core."
 readme = "README.md"
 requires-python = ">=3.10"

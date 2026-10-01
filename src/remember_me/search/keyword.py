@@ -12,7 +12,11 @@ from remember_me.core.models import (
     SearchAssetsResult,
     SearchResultItem,
 )
-from remember_me.core.normalization import _clean_scalar, _normalize_tags
+from remember_me.core.normalization import (
+    _clean_scalar,
+    _normalize_tags,
+    tag_comparison_key,
+)
 
 
 _REASON_PRIORITY = {
@@ -53,7 +57,7 @@ def _asset_matches_filters(
     if request.created_to and created > request.created_to[:10]:
         return False
     if required_tags:
-        identities = {tag.casefold() for tag in asset.tags}
+        identities = {tag_comparison_key(tag) for tag in asset.tags}
         if any(tag not in identities for tag in required_tags):
             return False
     return True
@@ -66,14 +70,14 @@ def _reasons_for(asset: AssetRecord, query: str) -> tuple[tuple[str, ...], int]:
     query_folded = query.casefold()
     if asset.asset_id.casefold() == query_folded:
         reasons.append("asset_id_exact")
-    if any(tag.casefold() == query_folded for tag in asset.tags):
+    if any(tag_comparison_key(tag) == query_folded for tag in asset.tags):
         reasons.append("tag_exact")
-    title = asset.title.casefold()
+    title = _clean_scalar(asset.title).casefold()
     if title == query_folded or title.startswith(query_folded) or query_folded in title:
         reasons.append("title_exact")
-    if query_folded in asset.original_filename.casefold():
+    if query_folded in _clean_scalar(asset.original_filename).casefold():
         reasons.append("filename")
-    if query_folded in asset.description.casefold():
+    if query_folded in _clean_scalar(asset.description).casefold():
         reasons.append("description")
     if not reasons:
         return (), len(_REASON_PRIORITY)
@@ -87,7 +91,7 @@ def keyword_search(
 ) -> SearchAssetsResult:
     query = _clean_scalar(request.query)
     required_tags = tuple(
-        value.casefold() for value in _normalize_tags(request.tags)
+        tag_comparison_key(value) for value in _normalize_tags(request.tags)
     )
     candidates: list[tuple[int, AssetRecord, tuple[str, ...]]] = []
     for asset in tuple(assets):
